@@ -1,0 +1,78 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="CODEROOMS - A real-time competitive coding platform where you can challenge friends and solve DSA problems together.">
+    <title>CODEROOMS | {% block title %}Live Coding Arena{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/global.css' %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <nav
+        style="position: sticky; top: 0; z-index: 100; background: rgba(9, 9, 11, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+        <div class="container"
+            style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <a href="/"
+                style="text-decoration: none; font-weight: 700; font-size: 1.5rem; color: var(--primary-neon); transition: transform 0.2s;">
+                <i class="fas fa-code" style="margin-right: 0.5rem;"></i>CODE<span style="color: #fff;">ROOMS</span>
+            </a>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                {% if user.is_authenticated %}
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    <!-- Dashboard Link -->
+                    <a href="{% url 'dashboard' %}"
+                        style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-chart-line"></i> Dashboard
+                    </a>
+
+                    <div
+                        style="display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
+                        <div
+                            style="width: 28px; height: 28px; background: var(--secondary-neon); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #000;">
+                            {{ user.username|slice:":1"|upper }}
+                        </div>
+                        <span style="color: var(--text-main); font-weight: 500;">{{ user.username }}</span>
+                    </div>
+                </div>
+                <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem;"><i
+                            class="fas fa-sign-out-alt" style="margin-right: 0.3rem;"></i>Logout</button>
+                </form>
+                {% else %}
+                <a href="{% url 'login' %}" class="btn btn-secondary"
+                    style="text-decoration: none; font-size: 0.9rem;">Login</a>
+                <a href="{% url 'signup' %}" class="btn btn-primary"
+                    style="text-decoration: none; font-size: 0.9rem;">Sign Up</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container" style="min-height: 85vh; padding-top: 2rem; padding-bottom: 2rem;">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer
+        style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.05);">
+        <div style="display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 1rem;">
+            <a href="#" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;"><i
+                    class="fab fa-github" style="font-size: 1.2rem;"></i></a>
+            <a href="#" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;"><i
+                    class="fab fa-twitter" style="font-size: 1.2rem;"></i></a>
+            <a href="#" style="color: var(--text-muted); text-decoration: none; transition: color 0.2s;"><i
+                    class="fab fa-discord" style="font-size: 1.2rem;"></i></a>
+        </div>
+        &copy; 2024 CODEROOMS. Built for Speed. <span style="color: var(--primary-neon);">⚡</span>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

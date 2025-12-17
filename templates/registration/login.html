@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container"
+    style="display: flex; justify-content: center; align-items: center; min-height: 70vh; padding: 2rem 0;">
+    <div class="card animate-fade-in"
+        style="width: 100%; max-width: 450px; padding: 3rem; text-align: center; box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);">
+        <div style="margin-bottom: 3rem;">
+            <h2
+                style="font-size: 2.5rem; margin-bottom: 0.5rem; background: linear-gradient(135deg, var(--primary-neon), var(--secondary-neon)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Welcome Back</h2>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">Login to continue your coding journey</p>
+        </div>
+
+        <form method="post" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            {% csrf_token %}
+            {% if form.errors %}
+            <div class="animate-shake"
+                style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); padding: 1rem; border-radius: var(--radius-sm); color: #fca5a5;">
+                <i class="fas fa-exclamation-circle" style="margin-right: 0.5rem;"></i>
+                Invalid username or password.
+            </div>
+            {% endif %}
+
+            <div style="text-align: left;">
+                <label
+                    style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem; display: block; font-weight: 500;">Username</label>
+                <input type="text" name="username" class="form-input" required autofocus
+                    style="width: 100%; transition: all 0.3s ease; border: 2px solid transparent;">
+            </div>
+
+            <div style="text-align: left;">
+                <label
+                    style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem; display: block; font-weight: 500;">Password</label>
+                <input type="password" name="password" class="form-input" required
+                    style="width: 100%; transition: all 0.3s ease; border: 2px solid transparent;">
+            </div>
+
+            <button type="submit" class="btn btn-primary"
+                style="margin-top: 1rem; width: 100%; padding: 1rem; font-size: 1.1rem; transition: all 0.3s ease; position: relative; overflow: hidden;">
+                <span style="position: relative; z-index: 1;">Login</span>
+            </button>
+        </form>
+
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1);">
+            <p style="color: var(--text-muted); font-size: 0.95rem;">
+                Don't have an account? <a href="{% url 'signup' %}"
+                    style="color: var(--secondary-neon); text-decoration: none; font-weight: 600; transition: all 0.2s ease;">Sign
+                    up</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes shake {
+
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+
+        10%,
+        30%,
+        50%,
+        70%,
+        90% {
+            transform: translateX(-5px);
+        }
+
+        20%,
+        40%,
+        60%,
+        80% {
+            transform: translateX(5px);
+        }
+    }
+
+    .animate-shake {
+        animation: shake 0.5s ease-in-out;
+    }
+
+    .form-input:focus {
+        border-color: var(--primary-neon) !important;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+    }
+
+    a:hover {
+        color: var(--primary-neon) !important;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,459 @@
+{% extends 'base.html' %}
+{% block title %}Arena - {{ room.room_id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Full screen layout */
+    main.container {
+        max-width: 100%;
+        padding: 0;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .arena-grid {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 0;
+        height: 100%;
+    }
+
+    .panel {
+        background: var(--bg-card);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .panel-header {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        font-weight: 600;
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    /* Editor Specifics */
+    #editor-container {
+        flex: 1;
+        width: 100%;
+    }
+
+    /* Resizer if we wanted draggable, for now fixed grid */
+
+    .console-panel {
+        height: 200px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: #000;
+        font-family: 'JetBrains Mono', monospace;
+        padding: 1rem;
+        overflow-y: auto;
+        font-size: 0.9rem;
+    }
+</style>
+<!-- Monaco Editor -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+<!-- Canvas Confetti -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="arena-grid">
+    <!-- Left Panel: Problem -->
+    <div class="panel" style="border-right: 1px solid rgba(255,255,255,0.1); overflow-y: auto;">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Problem</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ problem.difficulty }}</span>
+        </div>
+        <div style="padding: 1.5rem;">
+            <h2 style="margin-bottom: 1rem;">{{ problem.title }}</h2>
+            <div style="color: var(--text-muted); line-height: 1.7; margin-bottom: 2rem;">
+                {{ problem.description|linebreaks }}
+            </div>
+
+            {% if problem.test_cases %}
+            <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 8px;">
+                <h4 style="margin-bottom: 0.5rem;">Example</h4>
+                {% for tc in problem.test_cases|slice:":1" %}
+                <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem;">
+                    <div style="margin-bottom: 0.5rem;">
+                        <span style="color: var(--secondary-neon);">Input:</span> {{ tc.input }}
+                    </div>
+                    <div>
+                        <span style="color: var(--primary-neon);">Output:</span> {{ tc.output }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Live Leaderboard -->
+            <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 2rem;">
+                <h4 style="margin-bottom: 1rem; color: var(--secondary-neon);">Live Leaderboard</h4>
+                <div style="background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); overflow: hidden;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead style="background: rgba(255,255,255,0.05); color: var(--text-muted);">
+                            <tr>
+                                <th style="padding: 0.75rem; text-align: left;">Rank</th>
+                                <th style="padding: 0.75rem; text-align: left;">User</th>
+                                <th style="padding: 0.75rem; text-align: right;">Score</th>
+                                <th style="padding: 0.75rem; text-align: right;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <!-- Populated via WebSocket -->
+                            <tr>
+                                <td colspan="4" style="padding: 1rem; text-align: center; color: var(--text-muted);">
+                                    Waiting for updates...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Chat -->
+            <div
+                style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 2rem; display: flex; flex-direction: column; flex: 1; min-height: 200px;">
+                <h4 style="margin-bottom: 1rem; color: var(--primary-neon);">Room Chat</h4>
+                <div id="chat-messages"
+                    style="flex: 1; min-height: 150px; max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: 0.9rem;">
+                    <div style="color: var(--text-muted); text-align: center; font-style: italic;">Welcome to the chat!
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="chat-input" placeholder="Type a message..."
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 4px; color: #fff;">
+                    <button id="chat-send" class="btn btn-secondary" style="padding: 0.5rem 1rem;">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Editor & Console -->
+    <div class="panel" style="position: relative;">
+        <!-- Code Viewer Modal -->
+        <div id="code-viewer-modal"
+            style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 50; flex-direction: column;">
+            <div
+                style="padding: 0.5rem 1rem; background: var(--bg-card); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                <span id="modal-title" style="font-weight: bold; color: var(--primary-neon);">User's Code</span>
+                <button onclick="closeModal()"
+                    style="background: none; border: none; color: #fff; cursor: pointer;">✕</button>
+            </div>
+            <div id="read-only-editor" style="flex: 1;"></div>
+            <div
+                style="padding: 0.5rem; background: #000; font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid #333;">
+                Status: <span id="modal-status"></span> | Time: <span id="modal-time"></span>s
+            </div>
+        </div>
+
+        {% if is_spectator %}
+        <!-- Spectator Banner -->
+        <div
+            style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
+            <i class="fas fa-eye" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+            <h2 style="color: #fff; margin-bottom: 0.5rem;">Spectator Mode</h2>
+            <p style="color: var(--text-muted);">You are watching this match live.</p>
+        </div>
+        {% else %}
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <span>Code Editor</span>
+                <select
+                    style="background: #000; color: #fff; border: 1px solid #333; padding: 0.2rem; border-radius: 4px;">
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="cpp">C++</option>
+                </select>
+                <span id="attempts-display"
+                    style="font-size: 0.8rem; color: var(--secondary-neon); margin-left: 1rem;">Attempts: 0/3</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="run-btn" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">
+                    Run
+                </button>
+                <button id="submit-btn" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">
+                    Submit
+                </button>
+            </div>
+        </div>
+
+        <div id="editor-container"></div>
+
+        <div class="console-panel" id="console-output">
+            <span style="color: var(--text-muted);">Output will appear here...</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Monaco Editor
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+        window.editor = monaco.editor.create(document.getElementById('editor-container'), {
+            value: `{{ problem.initial_code|escapejs }}`,
+            language: 'python',
+            theme: 'vs-dark',
+            automaticLayout: true,
+            minimap: { enabled: false },
+            fontSize: 14,
+            fontFamily: "'JetBrains Mono', monospace"
+        });
+
+        // Read Only Editor for Modal
+        window.readOnlyEditor = monaco.editor.create(document.getElementById('read-only-editor'), {
+            value: "",
+            language: 'python',
+            theme: 'vs-dark',
+            automaticLayout: true,
+            readOnly: true,
+            minimap: { enabled: false },
+            fontSize: 14,
+            fontFamily: "'JetBrains Mono', monospace"
+        });
+    });
+
+    let mySubmissionCount = 0;
+    let amIFinished = false;
+
+    // WebSocket connection
+    const roomId = "{{ room.room_id }}";
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        wsScheme + '://' + window.location.host +
+        '/ws/room/' + roomId + '/'
+    );
+
+    chatSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'run_result') {
+            const res = data.result;
+            // ... (keep run logic same) ...
+            renderConsole(res, false);
+
+        } else if (data.type === 'submit_result') {
+            // Check limits
+            if (data.is_limit_reached) {
+                amIFinished = true;
+                mySubmissionCount = 3; // Maxed out
+                document.getElementById('submit-btn').disabled = true;
+                document.getElementById('submit-btn').innerText = "Limit Reached";
+                document.getElementById('submit-btn').style.background = 'var(--text-muted)';
+            } else {
+                mySubmissionCount++;
+            }
+            updateAttemptsDisplay();
+
+            const passed = data.passed;
+            if (passed) {
+                consoleOutput.innerHTML = '<h3 style="color: #10b981;">ALL TEST CASES PASSED! 🏆</h3>';
+                amIFinished = true; // Win means finished
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            } else {
+                if (data.error) {
+                    consoleOutput.innerHTML = `<h3 style="color: #ef4444;">${data.error}</h3><p>${data.message}</p>`;
+                } else {
+                    consoleOutput.innerHTML = '<h3 style="color: #ef4444;">submission failed</h3>';
+                    renderConsole(data.result, false);
+                }
+            }
+
+        } else if (data.type === 'leaderboard_update') {
+            const leaderboard = data.data;
+            const tbody = document.getElementById('leaderboard-body');
+            let html = '';
+
+            leaderboard.forEach((player, index) => {
+                const isMe = player.username === "{{ participant.user.username }}";
+                const rowStyle = isMe ? 'background: rgba(16, 185, 129, 0.1); font-weight: bold;' : '';
+                const rankColor = index === 0 ? '#fbbf24' : (index === 1 ? '#94a3b8' : (index === 2 ? '#b45309' : 'var(--text-muted)'));
+
+                // Status Logic
+                let statusHtml = '';
+                if (player.status === 'Finished') {
+                    statusHtml = '<span style="color: #10b981;">Result 🏆</span>';
+                    // Update my finished state if I see myself as finished (failsafe)
+                    if (isMe) {
+                        amIFinished = true;
+                        document.getElementById('submit-btn').disabled = true;
+                    }
+                } else {
+                    if (player.cases_passed > 0 && player.total_cases > 0) {
+                        statusHtml = `<span style="color: #ecc94b;">${player.cases_passed}/${player.total_cases} Passed</span>`;
+                    } else {
+                        statusHtml = `<span style="color: var(--text-muted);">${player.status}</span>`;
+                    }
+                }
+
+                // Clickable logic: If I am finished, I can click others
+                const clickAttr = (amIFinished && !isMe) ? `onclick="requestViewCode('${player.username}')" style="cursor: pointer;"` : '';
+                const hoverClass = (amIFinished && !isMe) ? 'class="tr-hover"' : '';
+
+                html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${rowStyle}" ${clickAttr} ${hoverClass}>
+                    <td style="padding: 0.75rem; color: ${rankColor};">#${index + 1}</td>
+                    <td style="padding: 0.75rem;">
+                        ${player.username} <span style="font-size: 0.8em; color: var(--secondary-neon);">(${player.rating})</span> ${player.is_host ? '<span style="font-size:0.7em; background:var(--primary-neon); color:black; padding:0.1rem 0.3rem; border-radius:2px;">HOST</span>' : ''}
+                        ${(amIFinished && !isMe) ? '<i class="fas fa-eye" style="margin-left:5px; font-size:0.7em; opacity:0.7;"></i>' : ''}
+                    </td>
+                    <td style="padding: 0.75rem; text-align: right; font-family: 'JetBrains Mono';">${player.score}</td>
+                    <td style="padding: 0.75rem; text-align: right;">
+                        ${statusHtml}
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        } else if (data.type === 'submission_code') {
+            openModal(data.username, data.code, data.passed, data.execution_time);
+        } else if (data.type === 'error') {
+            alert(data.message);
+        } else if (data.type === 'chat_message') {
+            // ... existing chat logic ...
+            const chatMessages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            const isMe = data.username === "{{ participant.user.username }}";
+            div.style.marginBottom = '0.5rem';
+            div.innerHTML = `
+                 <span style="color: var(--text-muted); font-size: 0.8rem;">[${data.timestamp}]</span>
+                 <span style="color: ${isMe ? 'var(--primary-neon)' : 'var(--secondary-neon)'}; font-weight: bold;">${data.username}:</span>
+                 <span style="color: #fff;">${data.message}</span>
+             `;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        } else if (data.type === 'game_over') {
+            console.log("DEBUG: Game Over Event Received. Redirecting...");
+            window.location.href = `/room/${roomId}/over/`;
+        }
+    };
+
+    function renderConsole(res, isSubmit) {
+        let outputHtml = '';
+        res.results.forEach(r => {
+            const color = r.passed ? '#10b981' : '#ef4444';
+            outputHtml += `<div style="margin-bottom: 0.5rem; border-left: 2px solid ${color}; padding-left: 0.5rem;">`;
+            outputHtml += `<div>Input: ${r.input}</div>`;
+            outputHtml += `<div>Expected: ${r.expected}</div>`;
+            outputHtml += `<div>Actual: ${r.actual}</div>`;
+            outputHtml += `</div>`;
+        });
+        consoleOutput.innerHTML = outputHtml;
+    }
+
+    const runBtn = document.getElementById('run-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const consoleOutput = document.getElementById('console-output');
+
+    // Chat Logic
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
+
+    function sendMessage() {
+        const msg = chatInput.value.trim();
+        if (msg) {
+            chatSocket.send(JSON.stringify({
+                'action': 'chat_message',
+                'message': msg
+            }));
+            chatInput.value = '';
+        }
+    }
+
+    chatSend.onclick = sendMessage;
+    chatInput.onkeypress = function (e) {
+        if (e.key === 'Enter') sendMessage();
+    };
+
+    if (runBtn) {
+        runBtn.onclick = function () {
+            consoleOutput.innerHTML = '<span style="color: #ecc94b;">Running...</span>';
+            const code = window.editor.getValue();
+            chatSocket.send(JSON.stringify({
+                'action': 'run_code',
+                'code': code
+            }));
+        };
+    }
+
+    if (submitBtn) {
+        submitBtn.onclick = function () {
+            if (mySubmissionCount >= 3) return;
+            consoleOutput.innerHTML = '<span style="color: #ecc94b;">Submitting...</span>';
+            const code = window.editor.getValue();
+            chatSocket.send(JSON.stringify({
+                'action': 'submit_code',
+                'code': code
+            }));
+        };
+    }
+
+    function updateAttemptsDisplay() {
+        document.getElementById('attempts-display').innerText = `Attempts: ${mySubmissionCount}/3`;
+    }
+
+    // Modal Logic
+    function requestViewCode(targetUsername) {
+        chatSocket.send(JSON.stringify({
+            'action': 'get_submission_code',
+            'target_username': targetUsername
+        }));
+    }
+
+    function openModal(username, code, passed, time) {
+        const modal = document.getElementById('code-viewer-modal');
+        document.getElementById('modal-title').innerText = `${username}'s Solution`;
+
+        window.readOnlyEditor.setValue(code);
+
+        const statusColor = passed ? '#10b981' : '#ef4444';
+        const statusText = passed ? 'PASSED' : 'FAILED';
+        document.getElementById('modal-status').innerHTML = `<span style="color:${statusColor}; font-weight:bold;">${statusText}</span>`;
+        document.getElementById('modal-time').innerText = time;
+
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('code-viewer-modal').style.display = 'none';
+    }
+    window.closeModal = closeModal;
+    window.requestViewCode = requestViewCode;
+    window.updateAttemptsDisplay = updateAttemptsDisplay;
+
+    // --- Anti-Cheat Logic ---
+    const antiCheatEnabled = "{{ room.anti_cheat_enabled|yesno:'true,false' }}" === "true";
+    const isObserver = "{{ is_spectator|yesno:'true,false' }}" === "true";
+
+    if (antiCheatEnabled && !isObserver) { // isObserver from user/spectator context
+        // We need to define isObserver. Let's rely on 'runBtn' existence? 
+        // Or better, check if I am a participant.
+        // If runBtn exists, I am a player.
+
+        if (document.getElementById('run-btn')) {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    // Send warning to server
+                    chatSocket.send(JSON.stringify({
+                        'action': 'cheat_alert',
+                        'type': 'tab_switch'
+                    }));
+                    // UI Warning (Optional, maybe annoying via alert, let's just log or toast?)
+                    // alert("⚠ Warning: Tab switching is monitored!");
+                }
+            });
+        }
+    }
+</script>
+<style>
+    .tr-hover:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+</style>
+{% endblock %}

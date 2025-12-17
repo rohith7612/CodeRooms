@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 2rem auto;">
+    <div class="card animate-fade-in">
+        <h2 style="text-align: center; margin-bottom: 2rem; color: var(--primary-neon);">Setup Coding Room</h2>
+
+        <form method="post" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            {% csrf_token %}
+
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="color: var(--text-muted);">DSA Topic</label>
+                {{ form.topic }}
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="color: var(--text-muted);">Difficulty</label>
+                {{ form.difficulty }}
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="color: var(--text-muted);">Passcode (Optional)</label>
+                {{ form.passcode }}
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">
+                Create Room
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .form-input {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #fff;
+        padding: 0.75rem;
+        border-radius: var(--radius-sm);
+        outline: none;
+        width: 100%;
+    }
+
+    .form-input:focus {
+        border-color: var(--primary-neon);
+    }
+
+    select.form-input {
+        background: #18181b;
+        /* Ensure dropdown works on dark bg */
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard - CodeRooms{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; padding-top: 2rem;">
+
+    <!-- Header -->
+    <div style="margin-bottom: 3rem; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+            <h1 style="
+                font-size: 2.5rem;
+                background: linear-gradient(45deg, #10b981, #3b82f6);
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 0.5rem;">
+                {{ user.username }}'s Dashboard
+            </h1>
+            <p style="color: var(--text-muted);">Your coding journey stats and history.</p>
+        </div>
+
+        <div style="text-align: right;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #fff;">
+                Rating:
+                <span style="color: #fbbf24;">{{ profile.rating|default:0 }}</span>
+            </div>
+            <div style="color: var(--text-muted); font-size: 0.9rem;">Rank: Beginner</div>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    ">
+
+        <!-- Total Points -->
+        <div class="stat-card">
+            <div class="stat-label">Total Points</div>
+            <div class="stat-value" style="color:#10b981;">{{ total_points|default:0 }}</div>
+        </div>
+
+        <!-- Matches Played -->
+        <div class="stat-card">
+            <div class="stat-label">Matches Played</div>
+            <div class="stat-value" style="color:#f472b6;">{{ profile.matches_played|default:0 }}</div>
+        </div>
+
+        <!-- Wins -->
+        <div class="stat-card">
+            <div class="stat-label">Wins</div>
+            <div class="stat-value" style="color:#fbbf24;">{{ profile.wins|default:0 }}</div>
+        </div>
+
+        <!-- Win Rate -->
+        <div class="stat-card">
+            <div class="stat-label">Global Win Rate</div>
+            <div class="stat-value" style="color:#3b82f6;">
+                {% if profile.matches_played > 0 %}
+                {% widthratio profile.wins profile.matches_played 100 %}%
+                {% else %}
+                0%
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Analysis Section -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-bottom:2rem;">
+
+        <!-- Topic Analysis -->
+        <div class="card">
+            <h3 class="card-title">Topic Analysis</h3>
+
+            {% if topic_stats %}
+            {% for topic in topic_stats %}
+            <div class="topic-row">
+                <div>
+                    <strong>{{ topic.name }}</strong>
+                    <span class="muted">({{ topic.passed }}/{{ topic.total }} solved)</span>
+                </div>
+
+                <div class="progress-wrapper">
+                    <div class="
+                                {% if topic.win_rate > 70 %}progress-high
+                                {% elif topic.win_rate > 40 %}progress-med
+                                {% else %}progress-low
+                                {% endif %}
+                            "
+                        style="--progress: {{ topic.win_rate|default:0 }}%; width: var(--progress); height: 100%;">
+                    </div>
+                </div>
+                <span>{{ topic.win_rate|floatformat:0 }}%</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="muted">No topic data yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Insights -->
+    <div class="card">
+        <h3 class="card-title">Insights</h3>
+
+        <div style="margin-bottom:1rem;">
+            <h4 class="insight-good">Strongest Topic</h4>
+            <p>{% if strongest_topic %}{{ strongest_topic.name }} 🚀{% else %}Not enough data{% endif %}</p>
+        </div>
+
+        <div>
+            <h4 class="insight-bad">Needs Improvement</h4>
+            <p>{% if weakest_topic %}{{ weakest_topic.name }} 🎯{% else %}Not enough data{% endif %}</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- Match History -->
+<div class="card" style="margin-top: 2rem;">
+    <h3 class="card-title">Match History</h3>
+
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>Room</th>
+                <th>Problem</th>
+                <th>Topic</th>
+                <th class="right">Score</th>
+                <th class="right">Date</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for p in recent_matches %}
+            <tr class="table-row-hover">
+                <td class="mono">{{ p.room.room_id }}</td>
+
+                <td>
+                    {% if p.room.problem %}
+                    {{ p.room.problem.title }}
+                    {% else %}
+                    <span class="muted">(Deleted)</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if p.room.problem and p.room.problem.topic %}
+                    <span class="badge">{{ p.room.problem.topic }}</span>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+
+                <td class="right">
+                    <strong class="{% if p.score > 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ p.score }}
+                    </strong>
+                </td>
+
+                <td class="right muted">
+                    {{ p.joined_at|date:"M d, Y" }}
+                </td>
+            </tr>
+
+            {% empty %}
+            <tr>
+                <td colspan="5" class="empty">
+                    No matches played yet.
+                    <a href="{% url 'create_room' %}">Start a match!</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<style>
+    .card {
+        background: var(--bg-card);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 2rem;
+        border-radius: 12px;
+    }
+
+    .card-title {
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-card {
+        background: var(--bg-card);
+        padding: 1.5rem;
+        border-radius: 12px;
+    }
+
+    .stat-label {
+        color: var(--text-muted);
+        font-size: .9rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+
+    .table-row-hover:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .progress-high {
+        background: #10b981;
+        height: 100%;
+    }
+
+    .progress-med {
+        background: #fbbf24;
+        height: 100%;
+    }
+
+    .progress-low {
+        background: #ef4444;
+        height: 100%;
+    }
+
+    .progress-bar {
+        flex: 1;
+        height: 8px;
+        background: rgba(255, 255, 255, .1);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        width: 50%;
+    }
+
+    .muted {
+        color: var(--text-muted);
+        font-size: .85rem;
+    }
+
+    .mono {
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .badge {
+        background: rgba(255, 255, 255, .1);
+        padding: .2rem .6rem;
+        border-radius: 12px;
+        font-size: .8rem;
+    }
+
+    .right {
+        text-align: right;
+    }
+
+    .text-success {
+        color: #10b981;
+    }
+
+    .text-danger {
+        color: #ef4444;
+    }
+
+    .empty {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+    }
+
+    /* Table Styles */
+    .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .history-table th {
+        padding: 1rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        background: rgba(255, 255, 255, 0.02);
+        font-weight: normal;
+    }
+
+    .history-table td {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+</style>
+{% endblock %}

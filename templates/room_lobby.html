@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container animate-fade-in">
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="font-size: 2.5rem;">Room <span
+                style="font-family: 'JetBrains Mono'; color: var(--secondary-neon);">{{ room.room_id }}</span></h1>
+        <p style="color: var(--text-muted);">Topic: <strong style="color: #fff;">{{ room.topic }}</strong> • Difficulty:
+            <strong style="color: #fff;">{{ room.difficulty }}</strong>
+        </p>
+    </div>
+
+    <div class="grid-cols-2" style="max-width: 900px; margin: 0 auto; gap: 2rem;">
+        <!-- Participants List -->
+        <div class="card">
+            <h3 style="margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
+                Participants
+            </h3>
+            <div id="participant-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                {% for p in room.participants.all %}
+                <div
+                    style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: var(--radius-sm);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div
+                            style="width: 32px; height: 32px; background: var(--secondary-neon); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #000;">
+                            {{ p.user.username|slice:":1"|upper }}
+                        </div>
+                        <span>{{ p.user.username }}</span>
+                    </div>
+                    {% if p.user == room.host %}
+                    <span
+                        style="font-size: 0.75rem; background: var(--primary-neon); color: #000; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">HOST</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Game Info / Settings -->
+        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h3 style="margin-bottom: 1rem;">Game Status</h3>
+                {% if room.is_active %}
+                <p style="color: #10b981; margin-bottom: 1rem; font-weight: bold;">
+                    MATCH IN PROGRESS 🟢
+                </p>
+                <div style="margin-bottom: 1rem;">
+                    {% if not participant %}
+                    <a href="{% url 'arena' room.room_id %}" class="btn btn-secondary"
+                        style="width: 100%; display: block; text-align: center; text-decoration: none;">
+                        <i class="fas fa-eye"></i> Spectate Match
+                    </a>
+                    {% else %}
+                    <a href="{% url 'arena' room.room_id %}" class="btn btn-primary"
+                        style="width: 100%; display: block; text-align: center; text-decoration: none;">
+                        Rejoin Match
+                    </a>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    Waiting for host to start...
+                </p>
+                <div
+                    style="background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: var(--radius-sm); border-left: 3px solid var(--primary-neon);">
+                    <i class="fas fa-info-circle" style="color: var(--primary-neon);"></i>
+                    <span style="margin-left: 0.5rem; font-size: 0.9rem;">
+                        Share the Room ID <strong>{{ room.room_id }}</strong> to invite others.
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if not room.is_active %}
+            {% if is_host %}
+            <div style="margin-top: 2rem;">
+                <button class="btn btn-primary" style="width: 100%; font-size: 1.1rem;">
+                    Start Game <i class="fas fa-play" style="margin-left: 0.5rem;"></i>
+                </button>
+            </div>
+            {% else %}
+            <div style="margin-top: 2rem; text-align: center;">
+                <p class="animate-pulse" style="color: var(--text-muted);">Waiting for {{ room.host.username }} to
+                    start...</p>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- Chat -->
+        <div class="card" style="grid-column: span 2; display: flex; flex-direction: column; min-height: 300px;">
+            <h3 style="margin-bottom: 1rem; color: var(--primary-neon);">Lobby Chat</h3>
+            <div id="chat-messages"
+                style="flex: 1; max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: 0.9rem;">
+                <div style="color: var(--text-muted); text-align: center; font-style: italic;">Welcome to the lobby!
+                    Chat while you wait.</div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" id="chat-input" placeholder="Type a message..."
+                    style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; border-radius: 4px; color: #fff;">
+                <button id="chat-send" class="btn btn-secondary" style="padding: 0.75rem 1.5rem;">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const roomId = "{{ room.room_id }}";
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        wsScheme + '://' + window.location.host +
+        '/ws/room/' + roomId + '/'
+    );
+
+    const participantList = document.getElementById('participant-list');
+
+    chatSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+
+        if (data.type === 'player_join') {
+            // Check if already exists to avoid dupes (simple check)
+            const exists = Array.from(participantList.children).some(child => child.innerText.includes(data.username));
+
+            if (!exists) {
+                const div = document.createElement('div');
+                div.style.cssText = "display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: var(--radius-sm); animation: fadeIn 0.5s ease-out;";
+
+                let hostBadge = '';
+                if (data.is_host) {
+                    hostBadge = '<span style="font-size: 0.75rem; background: var(--primary-neon); color: #000; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">HOST</span>';
+                }
+
+                div.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="width: 32px; height: 32px; background: var(--secondary-neon); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #000;">
+                            ${data.username.charAt(0).toUpperCase()}
+                        </div>
+                        <span>${data.username}</span>
+                    </div>
+                    ${hostBadge}
+                `;
+                participantList.appendChild(div);
+            }
+        } else if (data.type === 'game_start') {
+            window.location.href = `/room/${data.room_id}/arena/`;
+        } else if (data.type === 'chat_message') {
+            const chatMessages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            // Assuming current user context isn't directly available in JS as var, we can render it or use session
+            // For now let's just use the style based on username match if possible, or just standard
+            const myUsername = "{{ request.user.username }}";
+            const isMe = data.username === myUsername;
+
+            div.style.marginBottom = '0.5rem';
+            div.innerHTML = `
+                <span style="color: var(--text-muted); font-size: 0.8rem;">[${data.timestamp}]</span>
+                <span style="color: ${isMe ? 'var(--primary-neon)' : 'var(--secondary-neon)'}; font-weight: bold;">${data.username}:</span>
+                <span style="color: #fff;">${data.message}</span>
+            `;
+            chatMessages.appendChild(div);
+            // Auto scroll
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    };
+
+    // Chat Logic
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
+
+    function sendMessage() {
+        const msg = chatInput.value.trim();
+        if (msg) {
+            chatSocket.send(JSON.stringify({
+                'action': 'chat_message',
+                'message': msg
+            }));
+            chatInput.value = '';
+        }
+    }
+
+    if (chatSend) {
+        chatSend.onclick = sendMessage;
+        chatInput.onkeypress = function (e) {
+            if (e.key === 'Enter') sendMessage();
+        };
+    }
+
+    chatSocket.onclose = function (e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    // Host Start Game logic
+    const isHost = "{{ is_host|yesno:'true,false' }}" === "true";
+
+    if (isHost) {
+        const startBtn = document.querySelector('.btn-primary');
+        if (startBtn) {
+            startBtn.onclick = function () {
+                chatSocket.send(JSON.stringify({
+                    'action': 'start_game'
+                }));
+            };
+        }
+    }
+</script>
+{% endblock %}
