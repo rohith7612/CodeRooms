@@ -5,7 +5,8 @@ from django.conf import settings
 from .models import Problem
 
 def generate_problem_via_ai(topic, difficulty):
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = settings.OPENAI_API_KEY
+
     if not api_key:
         print("OpenAI API Key not found.")
         return None
