@@ -10,6 +10,30 @@
         </p>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loading-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+        <div class="loader"
+            style="width: 60px; height: 60px; border: 4px solid var(--secondary-neon); border-top: 4px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1.5rem;">
+        </div>
+        <h2 style="color: #fff; text-align: center; font-size: 1.5rem; margin-bottom: 0.5rem;">Generating Challenge...
+        </h2>
+        <p class="animate-pulse" style="color: var(--text-muted); text-align: center; max-width: 400px;">Our AI is
+            crafting a unique problem for this match. Get ready!</p>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
     <div class="grid-cols-2" style="max-width: 900px; margin: 0 auto; gap: 2rem;">
         <!-- Participants List -->
         <div class="card">
@@ -218,6 +242,9 @@
         const startBtn = document.querySelector('.btn-primary');
         if (startBtn) {
             startBtn.onclick = function () {
+                // Show Loader
+                document.getElementById('loading-overlay').style.display = 'flex';
+
                 chatSocket.send(JSON.stringify({
                     'action': 'start_game'
                 }));
